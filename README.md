@@ -1,12 +1,126 @@
 # DS5Dongle BL618
 
-[中文文档 (Chinese)](README_CN.md)
+**English** | [Português](README_PT.md)
 
 A wireless DualSense controller adapter based on BL616/BL618. It bridges a DualSense or DualSense Edge gamepad over Bluetooth Classic (BR/EDR) HID to a host PC via USB HID, appearing as a standard wired DualSense (VID 054C / PID 0CE6) or DualSense Edge (PID 0DF2). Fully compatible with Steam, SDL, PS Remote Play, and more.
 
 Ported from [awalol/DS5Dongle](https://github.com/awalol/DS5Dongle) (Raspberry Pi Pico 2W). The BT stack was migrated from BTstack to Bouffalo SDK (Zephyr-based), and the USB stack from TinyUSB to CherryUSB.
 
 > **Unofficial project** — not affiliated with or endorsed by Sony Interactive Entertainment. "DualSense", "DualSense Edge" and "PlayStation" are trademarks of Sony Interactive Entertainment. The USB VID/PID values (054C:0CE6 / 0DF2) are emulated so the host sees a standard wired controller; use at your own risk.
+
+## Quick Start for Windows (prebuilt firmware, no programming)
+
+A step-by-step guide for the **LCTech BL616** board. No soldering and no programming knowledge needed, about 10 minutes. (Portuguese version: [README_PT.md](README_PT.md) · PDF: [docs/guia-pt.pdf](docs/guia-pt.pdf).)
+
+![Controller → Bluetooth → dongle → USB → PC](docs/img/en/arch.png)
+
+**You will need:** the BL616 board (blue, USB-C input and a button marked BOOT), a USB-C **data** cable (charge-only cables do not work), a Windows PC with internet, and a DualSense (PS5) or DualSense Edge controller.
+
+### Know the board
+
+![Board top view](docs/img/en/board.png)
+
+| # | Part | What it is for |
+|---|------|----------------|
+| 1 | USB-C input | The cable to the PC plugs in here. Use a short data cable. |
+| 2 | BOOT button | Used to flash the firmware and, later, to switch or clear controller pairings. |
+| 3 | LEDs | Red = power. Blue = dongle status (see the LED table below). |
+| 4 | Ceramic antenna | This is the Bluetooth antenna. Do not cover it with metal or foil. |
+| 5 | Pin holes | **Not used.** The supplied 8-pin header can be kept aside. |
+| 6 | BL616 chip | The brain: handles Bluetooth and USB. |
+
+### Step 1 — Download the files
+
+1. Download the firmware package (ZIP, about 1 MB): [ds5dongle-bl618-lctech616-v3.22.zip](https://github.com/sqlCRT/ds5dongle-bl618-opensource/releases/download/v3.22/ds5dongle-bl618-lctech616-v3.22.zip).
+2. Right-click the ZIP → **Extract all...** (suggested folder: `C:\DS5Dongle`).
+3. Download and install [Bouffalo Lab Dev Cube](https://dev.bouffalolab.com/download), the chip maker's official flashing tool.
+
+*Prefer PowerShell?* From the root of this repository run the command below. It downloads the ZIP, extracts it to `C:\DS5Dongle`, verifies the SHA256 hashes and opens the folder:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File docs\baixar-firmware.ps1
+```
+
+| File (inside the extracted folder) | What it is |
+|------------------------------------|------------|
+| `ds5dongle-lctech616.bin` | **FS** (Full-Speed) firmware — **start with this one**. Best cable/port compatibility. |
+| `ds5dongle-lctech616-hs.bin` | **HS** (High-Speed) firmware — faster polling, needs a good cable and port. Optional. |
+| `boot2_bl616_isp_release_v8.1.8.bin` | Board boot loader (required when flashing). |
+| `partition_cfg_4M_nosec.toml` | Partition table: **always the `nosec` version**. |
+
+### Step 2 — Put the board in flash mode
+
+![Hold BOOT, plug in, release BOOT](docs/img/en/bootmode.png)
+
+1. With the board **unplugged**, **press and hold** the BOOT button (use a paperclip or toothpick tip if needed).
+2. Without releasing it, plug the USB-C cable into the PC.
+3. Only now release the button.
+
+**How do I know it worked?** Dev Cube (next step) will list a new **COM port** (e.g. COM5). If not: try another cable (charge-only cables do not work) or another USB port, or unplug and start over.
+
+### Step 3 — Configure Dev Cube
+
+Open Dev Cube, pick the chip and fill the fields as shown (the files are in the folder you extracted in Step 1):
+
+![Dev Cube fields](docs/img/en/devcube.png)
+
+> **Careful with field 4:** choose `partition_cfg_4M_nosec.toml`. A similar file without "nosec" in its name exists — **do not use it**.
+
+### Step 4 — Flash the firmware
+
+1. Check that all 6 fields are filled and click **Create & Download**.
+2. Wait for the progress bar to finish and the success message. **Do not unplug the cable while flashing.**
+3. Unplug and plug the cable again, **without pressing BOOT**.
+4. The blue LED should **blink slowly**: the dongle is ready and waiting for a controller.
+
+### Step 5 — Pair the controller
+
+![Pairing](docs/img/en/pair.png)
+
+1. With the dongle plugged in (LED blinking slowly) and the controller **off**, hold **PS + Create** for 3 seconds until the controller light starts blinking.
+2. Within a few seconds the dongle LED blinks fast (searching), then turns **solid**: connected.
+3. Windows now sees a **"DualSense Wireless Controller"**, as if it were wired. Open a game or Steam and test.
+
+> **Tips:** do not pair the controller through Windows Bluetooth (the dongle does it by itself). If the controller was connected to another device (PS5, phone), turn that device's Bluetooth off first. Next time just turn the controller on with the PS button: it reconnects on its own.
+
+#### What the blue LED is telling you
+
+![LED table](docs/img/en/leds.png)
+
+### Daily use
+
+![BOOT button gestures](docs/img/en/gestures.png)
+
+- **Create + Options for 3 seconds:** toggles between DualSense mode and **Xbox 360** mode (XInput-compatible games). The controller rumbles and the dongle restarts by itself.
+- **PS button:** can wake the PC from sleep (on by default). After waking, press PS again to reconnect.
+- **Configuration page (optional):** with the dongle plugged in, open [ps5.ds5678.top](https://ps5.ds5678.top) in **Chrome or Edge** and allow device access. You can change polling rate, haptics strength, remap buttons, light-bar color, Xbox mode, idle power saving and more. Online OTA does not work with this open-source build: to update, flash again with Dev Cube.
+
+### If something does not work
+
+| Symptom | What to do |
+|---------|------------|
+| Dev Cube shows no COM port | Charge-only cable or bad port. Swap the cable/port and redo Step 2 (BOOT held **before** plugging in). |
+| Flashed, but the blue LED does not light | Unplug and plug again. If it persists, flash again making sure you used the **nosec** partition. |
+| Controller does not connect | Controller off? Hold PS + Create until it blinks. If it connected before, hold the dongle's BOOT for 3 s (clears pairings) and pair again. |
+| Does not reconnect after being idle | In the configuration page, turn off idle auto-disconnect. |
+| Audio cutting out, stutter, disconnects | Use a rear USB port (straight on the motherboard) and a good, short cable. Prefer the FS firmware over HS. |
+| The LED turned itself off | Normal: it turns off after 1 minute. The controller still works. |
+
+> **Important:** after flashing v3.18 or newer you **cannot go back** to a version older than 3.18 (the board stops booting; it can only be recovered by flashing a newer version over the serial port).
+
+### 3D-printed case (optional)
+
+A two-piece snap-fit case (no screws) for the BL616 board: external size **50.1 × 27.1 × 9.5 mm**, no pin header, with a USB-C opening for common plugs, a window for the LEDs and a plunger for the BOOT button.
+
+![Case cross-section](docs/img/en/section.png)
+
+- Files: [`case-3d/saida/`](case-3d/saida) — `ds5dongle_case_base.step`, `ds5dongle_case_tampa.step` (lid), `ds5dongle_case_botao.step` (button); `_montada.step` is for viewing only.
+- Regenerate or tweak the dimensions with `case-3d/case.py` (CadQuery) or just run `py case-3d\gerar_tudo.py`.
+- **Dimensions were estimated from the listing photos** (board ≈ 45.5 × 22.5 mm). Measure your board with calipers and **print only the base first** to test the fit.
+- PLA or PETG, 0.4 mm nozzle, 0.2 mm layers, no supports. Base: floor down. Lid: upside down. Button: thin tip (top) down.
+- Assembly: board in the base (USB-C on the wide-opening side) → red button under the lid with its tip through the hole → press the lid on. Use the notch at the end opposite the USB to pry it open.
+
+---
 
 ## Supported Boards
 
@@ -42,7 +156,7 @@ If the host does not supply power over USB, the board needs separate power via i
 
 > **LCTech BL616 / M0S Dock**: USB is natively connected via Type-C. No wiring needed.
 
-## Getting Started
+## Building from Source (developers)
 
 ### 1. Bouffalo SDK (DS5Dongle fork — required)
 
